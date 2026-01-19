@@ -1,0 +1,24 @@
+/* Container becomes horizontal split */
+#app, .main-container {
+    display: flex !important;
+    flex-direction: row !important;
+    height: 100vh !important;
+    overflow: hidden !important;
+}
+
+/* Video section */
+#video-player, .player-container {
+    flex-grow: 1;
+    height: 100vh !important;
+    position: relative;
+}
+
+/* Chat section */
+#chat, .chat-container {
+    width: 350px; /* default width */
+    height: 100vh !important;
+    overflow-y: auto !important;
+    resize: horizontal;
+    overflow: auto;
+    border-left: 3px solid #333;
+}
