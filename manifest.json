@@ -1,7 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "CathodeTV Fix",
-  "version": "2.0",
+  "name": "Video Chat Resizer",
+  "version": "2.1",
+  "description": "Adds drag-to-resize functionality for video and chat layouts",
   "content_scripts": [
     {
       "matches": ["*://www.cathodetv.com/*"],

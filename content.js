@@ -2,20 +2,63 @@
   const DEFAULT_CHAT_PX = 520;
   const MIN_CHAT_PX = 150;
 
-  function waitForWrapper(cb) {
-    const w = document.querySelector('.wrapper');
+  // Site-specific configurations
+  // To add more sites: add entries with domain as key and config object
+  // - containerSelector: CSS selector for the container element (or null to skip)
+  // - waitForContainer: true to wait for specific container, false to wait for iframes directly
+  const SITE_CONFIGS = {
+    'cathodetv.com': {
+      containerSelector: '.wrapper',
+      waitForContainer: true,
+    }
+  };
+
+  function getCurrentSiteConfig() {
+    const hostname = window.location.hostname;
+    for (const [domain, config] of Object.entries(SITE_CONFIGS)) {
+      if (hostname.includes(domain)) {
+        return config;
+      }
+    }
+    return null;
+  }
+
+  function waitForWrapper(cb, config) {
+    // If site doesn't need a specific container, just wait for iframes
+    if (!config.waitForContainer) {
+      const checkIframes = () => {
+        const iframes = document.querySelectorAll('iframe');
+        if (iframes.length >= 2) return cb(document.body);
+        return null;
+      };
+
+      if (checkIframes()) return;
+
+      const mo = new MutationObserver(() => {
+        if (checkIframes()) mo.disconnect();
+      });
+      mo.observe(document.documentElement, { childList: true, subtree: true });
+
+      setTimeout(() => {
+        checkIframes();
+        try { mo.disconnect(); } catch (e) {}
+      }, 4000);
+      return;
+    }
+
+    // Original logic for sites with a specific container
+    const w = document.querySelector(config.containerSelector);
     if (w) return cb(w);
     const mo = new MutationObserver(() => {
-      const found = document.querySelector('.wrapper');
+      const found = document.querySelector(config.containerSelector);
       if (found) {
         mo.disconnect();
         cb(found);
       }
     });
     mo.observe(document.documentElement, { childList: true, subtree: true });
-    // fallback after a few seconds
     setTimeout(() => {
-      const f = document.querySelector('.wrapper');
+      const f = document.querySelector(config.containerSelector);
       if (f) {
         try { mo.disconnect(); } catch (e) {}
         cb(f);
@@ -28,9 +71,18 @@
   }
 
   function makeFullscreen(wrapper) {
-    // climb to the topmost container inside body that contains wrapper
-    let node = wrapper;
-    while (node.parentElement && node.parentElement !== document.body) node = node.parentElement;
+    let node;
+
+    // If wrapper is document.body, create a new container
+    if (wrapper === document.body) {
+      node = document.createElement('div');
+      node.id = 'video-chat-resizer-container';
+      document.body.appendChild(node);
+    } else {
+      // climb to the topmost container inside body that contains wrapper
+      node = wrapper;
+      while (node.parentElement && node.parentElement !== document.body) node = node.parentElement;
+    }
 
     // pin it to viewport
     Object.assign(node.style, {
@@ -61,12 +113,18 @@
 
   function pickIframes(node) {
     const iframes = Array.from(node.querySelectorAll('iframe'));
-    if (iframes.length >= 2) return [iframes[0], iframes[1]];
+
+    if (iframes.length >= 2) {
+      return [iframes[0], iframes[1]];
+    }
+
     // fallback heuristics across whole document
     const all = Array.from(document.querySelectorAll('iframe'));
     if (!all.length) return [null, null];
+
     const video = all.find(f => /ok\.ru|vk\.com|vkcdn|videoembed/.test(f.src)) || all[0];
     const chat = all.find(f => /minnit|chat|twitch|discordapp/.test(f.src)) || all[1] || all[0];
+
     return [video || null, chat || null];
   }
 
@@ -217,9 +275,47 @@
   }
 
   // run
+  const siteConfig = getCurrentSiteConfig();
+
+  if (!siteConfig) {
+    console.log('[Video Chat Resizer] Site not supported, extension will not activate');
+    return;
+  }
+
+  // Prevent multiple activations
+  if (window.__videoChatResizerActivated) {
+    console.log('[Video Chat Resizer] Already activated, skipping');
+    return;
+  }
+  window.__videoChatResizerActivated = true;
+
+  console.log('[Video Chat Resizer] Activating for:', window.location.hostname);
+
   waitForWrapper(wrapper => {
+    // Check if already activated (in case this runs again somehow)
+    if (document.getElementById('video-chat-resizer-container')) {
+      return;
+    }
+
+    // First, find the iframes before we manipulate the DOM
+    const [video, chat] = pickIframes(wrapper);
+
+    if (!video || !chat) {
+      console.warn('[Video Chat Resizer] Could not find both video and chat iframes');
+      return;
+    }
+
+    // Now create the fullscreen container
     const node = makeFullscreen(wrapper);
-    const [video, chat] = pickIframes(node);
+
+    // Move iframes into the fullscreen container if they're not already there
+    if (!node.contains(video)) {
+      node.appendChild(video);
+    }
+    if (!node.contains(chat)) {
+      node.appendChild(chat);
+    }
+
     applyStaticLayout(node, video, chat);
-  });
+  }, siteConfig);
 })();
