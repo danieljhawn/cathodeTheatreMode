@@ -1,11 +1,18 @@
 {
   "manifest_version": 3,
   "name": "Video Chat Resizer",
-  "version": "2.1",
+  "version": "2.2",
   "description": "Adds drag-to-resize functionality for video and chat layouts",
+  "permissions": ["activeTab"],
+  "action": {
+    "default_title": "Fix video/chat layout"
+  },
+  "background": {
+    "service_worker": "service_worker.js"
+  },
   "content_scripts": [
     {
-      "matches": ["*://www.cathodetv.com/*"],
+      "matches": ["*://cathodetv.com/*", "*://*.cathodetv.com/*"],
       "js": ["content.js"],
       "run_at": "document_end"
     }
